@@ -156,6 +156,37 @@ describe("OpenRouterHandler", () => {
 		])
 	})
 
+	it("should subtract cache read and cache write tokens in generation fallback", async () => {
+		const handler = new OpenRouterHandler({
+			openRouterApiKey: "test-api-key",
+		})
+		handler.lastGenerationId = "gen-123"
+
+		sinon.stub(handler, "fetchGenerationDetails").returns(
+			(async function* () {
+				yield {
+					native_tokens_prompt: 1000,
+					native_tokens_cached: 500,
+					native_tokens_cache_write: 300,
+					native_tokens_completion: 200,
+					total_cost: 1.23,
+				}
+			})() as any,
+		)
+
+		const usage = await handler.getApiStreamUsage()
+
+		should.exist(usage)
+		usage!.should.deepEqual({
+			type: "usage",
+			cacheWriteTokens: 300,
+			cacheReadTokens: 500,
+			inputTokens: 200,
+			outputTokens: 200,
+			totalCost: 1.23,
+		})
+	})
+
 	type ParallelToolCallsTestCase = {
 		modelId: string
 		enableParallelToolCalling: boolean

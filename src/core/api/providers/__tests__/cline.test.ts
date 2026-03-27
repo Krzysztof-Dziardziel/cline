@@ -1,5 +1,6 @@
 import "should"
 import { openRouterDefaultModelInfo } from "@shared/api"
+import axios from "axios"
 import sinon from "sinon"
 import { ClineAccountService } from "@/services/account/ClineAccountService"
 import { AuthService } from "@/services/auth/AuthService"
@@ -135,5 +136,40 @@ describe("ClineHandler", () => {
 
 		const payload = createStub.firstCall.args[0]
 		payload.parallel_tool_calls.should.equal(true)
+	})
+
+	it("should subtract cache read and cache write tokens in generation fallback", async () => {
+		const handler = createHandler({})
+		handler.lastGenerationId = "gen-123"
+
+		;(handler as any)._authService = { getAuthToken: async () => "test-token" }
+		;(handler as any).clineAccountService = { baseUrl: "https://api.cline.bot" }
+
+		sinon.stub(handler, "getModel").returns({
+			id: "anthropic/claude-sonnet-4.6",
+			info: openRouterDefaultModelInfo,
+		})
+
+		sinon.stub(axios, "get").resolves({
+			data: {
+				native_tokens_prompt: 1000,
+				native_tokens_cached: 500,
+				native_tokens_cache_write: 300,
+				native_tokens_completion: 200,
+				total_cost: 1.23,
+			},
+		} as any)
+
+		const usage = await handler.getApiStreamUsage(new Set())
+
+		should.exist(usage)
+		usage!.should.deepEqual({
+			type: "usage",
+			cacheWriteTokens: 300,
+			cacheReadTokens: 500,
+			inputTokens: 200,
+			outputTokens: 200,
+			totalCost: 1.23,
+		})
 	})
 })

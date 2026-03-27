@@ -286,9 +286,11 @@ export class ClineHandler implements ApiHandler {
 				})
 
 				const generation = response.data
-				const { cacheWriteTokens: usageCacheWriteTokens } = extractCacheTokenUsage(
+				const { cacheReadTokens: usageCacheReadTokens, cacheWriteTokens: usageCacheWriteTokens } = extractCacheTokenUsage(
 					generation as OpenAiCompatibleCacheUsage,
 				)
+				const cacheWriteTokens = generation?.native_tokens_cache_write ?? usageCacheWriteTokens
+				const cacheReadTokens = generation?.native_tokens_cached ?? usageCacheReadTokens
 				let totalCost = generation?.total_cost || 0
 				const modelId = this.getModel().id
 				const isFreeModel = resolvedFreeModelIds.has(normalizeModelId(modelId))
@@ -299,10 +301,10 @@ export class ClineHandler implements ApiHandler {
 
 				return {
 					type: "usage",
-					cacheWriteTokens: generation?.native_tokens_cache_write || usageCacheWriteTokens,
-					cacheReadTokens: generation?.native_tokens_cached || 0,
+					cacheWriteTokens,
+					cacheReadTokens,
 					// openrouter generation endpoint fails often
-					inputTokens: (generation?.native_tokens_prompt || 0) - (generation?.native_tokens_cached || 0),
+					inputTokens: (generation?.native_tokens_prompt || 0) - cacheReadTokens - cacheWriteTokens,
 					outputTokens: generation?.native_tokens_completion || 0,
 					totalCost,
 				}

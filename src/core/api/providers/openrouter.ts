@@ -184,16 +184,18 @@ export class OpenRouterHandler implements ApiHandler {
 			try {
 				const generationIterator = this.fetchGenerationDetails(this.lastGenerationId)
 				const generation = (await generationIterator.next()).value
-				const { cacheWriteTokens: usageCacheWriteTokens } = extractCacheTokenUsage(
+				const { cacheReadTokens: usageCacheReadTokens, cacheWriteTokens: usageCacheWriteTokens } = extractCacheTokenUsage(
 					generation as OpenAiCompatibleCacheUsage,
 				)
+				const cacheWriteTokens = generation?.native_tokens_cache_write ?? usageCacheWriteTokens
+				const cacheReadTokens = generation?.native_tokens_cached ?? usageCacheReadTokens
 				// Logger.log("OpenRouter generation details:", generation)
 				return {
 					type: "usage",
-					cacheWriteTokens: generation?.native_tokens_cache_write || usageCacheWriteTokens,
-					cacheReadTokens: generation?.native_tokens_cached || 0,
+					cacheWriteTokens,
+					cacheReadTokens,
 					// openrouter generation endpoint fails often
-					inputTokens: (generation?.native_tokens_prompt || 0) - (generation?.native_tokens_cached || 0),
+					inputTokens: (generation?.native_tokens_prompt || 0) - cacheReadTokens - cacheWriteTokens,
 					outputTokens: generation?.native_tokens_completion || 0,
 					totalCost: generation?.total_cost || 0,
 				}
